@@ -1,0 +1,35 @@
+{
+  "name": "json-parser",
+  "version": "0.0.1",
+  "description": "json parser RFC 7159",
+  "homepage": "https://github.com/WarrenLaz/json-parser#readme",
+  "bugs": {
+    "url": "https://github.com/WarrenLaz/json-parser/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WarrenLaz/json-parser.git"
+  },
+  "license": "ISC",
+  "author": "warren lazarraga",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "test": "jest"
+  },
+  "jest": {
+    "roots": [
+      "./tests"
+    ],
+    "transform": {
+      "^.+\\.tsx?$": "@swc/jest"
+    }
+  },
+  "devDependencies": {
+    "@swc/jest": "^0.2.39",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.3.0",
+    "jest": "^30.4.2",
+    "typescript": "^7.0.2"
+  }
+}
