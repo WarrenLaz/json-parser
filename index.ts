@@ -1,11 +1,8 @@
-import { Stack } from '@opensource-technologies/typescript-data-structure-library';
-
-function createNewEntry( currObj: Object, mykey: any, value : any) : Object{
-  return {...currObj, [mykey] : value}
-}
-
-function putNewObject(currObj: Object, newObj : Object) : Object{
-    return {...currObj, newObj}
+function typeResolver(token: string): any{
+    if(!isNaN(Number(token)) && String(token).trim() !== ""){
+        return Number(token);
+    }
+    return token;
 }
 
 function lexer(raw: string): Array<any> {
@@ -78,7 +75,7 @@ function lexer(raw: string): Array<any> {
         const next = raw[i + 1];
         if (!next || /\s/.test(next) || brackets.test(next) || structural.test(next) || next === '"') {
             if (word.trim()) {
-                tokens.push(word);
+                tokens.push(typeResolver(word));
                 word = "";
             }
         }
@@ -91,12 +88,19 @@ function lexer(raw: string): Array<any> {
     return tokens;
 }
 
+function createNewEntry( currObj: Object, mykey: any, value : any) : Object{
+  return {...currObj, [mykey] : value}
+}
+
+function putNewObject(currObj: Object, newObj : Object) : Object{
+    return {...currObj, newObj}
+}
 
 export function json(raw: string): Object {
   let result : Object = {};
-
+  let tokens : Array<any> = lexer(raw);
 
   return result;
 }
 
-console.log(lexer("{\"abcd\" : \"abds\", abs:1}"))
+console.log(lexer("{\"abcd\" : \"abds\", abs:1234}"))
