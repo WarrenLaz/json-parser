@@ -88,19 +88,37 @@ function lexer(raw: string): Array<any> {
     return tokens;
 }
 
+
 function createNewEntry( currObj: Object, mykey: any, value : any) : Object{
   return {...currObj, [mykey] : value}
 }
 
-function putNewObject(currObj: Object, newObj : Object) : Object{
-    return {...currObj, newObj}
+function putNewObjects(currObj: Object, newObjs : Array<Object>) : Object{
+    for(let i = 0; i < newObjs.length; i++){
+        let obj = newObjs[i];
+        currObj = {...currObj, obj}
+    }
+    return currObj
+}
+
+function parser(tokens: Array<any>): Object{
+    let stack: Array<Object> = []
+    for(let i=0; i < tokens.length; i++){
+        let token = tokens[i];
+        if(token == "{")
+            stack.push({});
+        if(token == "}")
+            stack.pop()
+    }
+
+    return stack.pop()!;
+
 }
 
 export function json(raw: string): Object {
-  let result : Object = {};
   let tokens : Array<any> = lexer(raw);
 
-  return result;
+  return parser(tokens);
 }
 
 console.log(lexer("{\"abcd\" : \"abds\", abs:1234}"))
