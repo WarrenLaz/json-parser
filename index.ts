@@ -2,6 +2,12 @@ function typeResolver(token: string): any{
     if(!isNaN(Number(token)) && String(token).trim() !== ""){
         return Number(token);
     }
+    if(token =="null")
+        return null
+    if(token == "true")
+        return true;
+    if(token == "false")
+        return false;
     return token;
 }
 
@@ -25,7 +31,6 @@ function lexer(raw: string): Array<any> {
 
         // 1. Handle Strings & Quotes
         if (c === '"') {
-            word += c;
             if (!isQuote) {
                 isQuote = true;
             } else {
@@ -93,32 +98,63 @@ function createNewEntry( currObj: Object, mykey: any, value : any) : Object{
   return {...currObj, [mykey] : value}
 }
 
-function putNewObjects(currObj: Object, newObjs : Array<Object>) : Object{
-    for(let i = 0; i < newObjs.length; i++){
-        let obj = newObjs[i];
-        currObj = {...currObj, obj}
-    }
-    return currObj
-}
-
 function parser(tokens: Array<any>): Object{
-    let stack: Array<Object> = []
-    for(let i=0; i < tokens.length; i++){
+    // keep objects in a stack. the top most is the current object
+    let stack: Array<Array<any>> = [];
+    //store the key to later construct an entry
+    let key: any = null;
+    //iterate until the last token which will always end with a "}" [closing bracket]
+    for(let i=0; i < tokens.length-1; i++){
         let token = tokens[i];
-        if(token == "{")
-            stack.push({});
-        if(token == "}")
-            stack.pop()
-    }
+        //opening bracket signals creation of a new object
+        if(token == "{"){
+            stack.push([key,{}]);
+        }
+        if(token == "["){
+            stack.push([key,[]]);
+        }
+        //closing bracket constructs the object and adds it to the parent
+        if(token == "}"){
+            stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], key, tokens[i-1]);
+            let previous = stack.pop()!;
+            stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], previous[0], previous[1]);
+            if(tokens[i+1]==",")
+                i++;
+            continue;
+        }
+        if(token == "]"){
+            stack[stack.length-1][1].push(tokens[i-1])
+            let previous = stack.pop()!;
+            stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], previous[0], previous[1]);
+            if(tokens[i+1]==",")
+                i++;
+            continue;
+        }
 
-    return stack.pop()!;
+        if(Array.isArray(stack[stack.length-1][1])){
+            if(token == ","){
+                stack[stack.length-1][1].push(tokens[i-1])
+            }
+        } else{
+            //the previous token of a semicolon will always be a key
+            if(token == ":"){
+                key = tokens[i-1];
+            }
+            if(token == ","){
+                stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], key, tokens[i-1]);
+            }
+            if(i == tokens.length-2){
+             stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], key, tokens[i]);
+            }
+        }
+    }
+    return stack.pop()![1];
 
 }
 
 export function json(raw: string): Object {
   let tokens : Array<any> = lexer(raw);
-
   return parser(tokens);
 }
-
-console.log(lexer("{\"abcd\" : \"abds\", abs:1234}"))
+const raw = "{\"glossary\":{\"title\":\"example glossary\",\"GlossDiv\":{\"title\":\"S\",\"GlossList\":{\"GlossEntry\":{\"ID\":\"SGML\",\"SortAs\":\"SGML\",\"GlossTerm\":\"Standard Generalized Markup Language\",\"Acronym\":\"SGML\",\"Abbrev\":\"ISO 8879:1986\",\"GlossDef\":{\"para\":\"A meta-markup language, used to create markup languages such as DocBook.\",\"GlossSeeAlso\":[\"GML\",\"XML\"]},\"GlossSee\":\"markup\"}}}}}";
+console.log(json(raw))
