@@ -98,63 +98,113 @@ function createNewEntry( currObj: Object, mykey: any, value : any) : Object{
   return {...currObj, [mykey] : value}
 }
 
-function parser(tokens: Array<any>): Object{
-    // keep objects in a stack. the top most is the current object
-    let stack: Array<Array<any>> = [];
+const PUNCT = ["{", "}", "[", "]", ":", ","];
+
+function parser(tokens: Array<any>): Object {
+    // keep containers in a stack as [key in parent, container]. the top is the current one
+    let stack: Array<[any, any]> = [];
     //store the key to later construct an entry
     let key: any = null;
-    //iterate until the last token which will always end with a "}" [closing bracket]
-    for(let i=0; i < tokens.length-1; i++){
-        let token = tokens[i];
-        //opening bracket signals creation of a new object
-        if(token == "{"){
-            stack.push([key,{}]);
-        }
-        if(token == "["){
-            stack.push([key,[]]);
-        }
-        //closing bracket constructs the object and adds it to the parent
-        if(token == "}"){
-            stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], key, tokens[i-1]);
-            let previous = stack.pop()!;
-            stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], previous[0], previous[1]);
-            if(tokens[i+1]==",")
-                i++;
-            continue;
-        }
-        if(token == "]"){
-            stack[stack.length-1][1].push(tokens[i-1])
-            let previous = stack.pop()!;
-            stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], previous[0], previous[1]);
-            if(tokens[i+1]==",")
-                i++;
-            continue;
-        }
+    let result: any = undefined;
+    //what kind of token is allowed next
+    let expect: "value" | "valueOrClose" | "key" | "keyOrClose" | "colon" | "commaOrClose" | "end" = "value";
 
-        if(Array.isArray(stack[stack.length-1][1])){
-            if(token == ","){
-                stack[stack.length-1][1].push(tokens[i-1])
-            }
-        } else{
-            //the previous token of a semicolon will always be a key
-            if(token == ":"){
-                key = tokens[i-1];
-            }
-            if(token == ","){
-                stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], key, tokens[i-1]);
-            }
-            if(i == tokens.length-2){
-             stack[stack.length-1][1]=createNewEntry(stack[stack.length-1][1], key, tokens[i]);
-            }
+    //put a finished value into the current container, or make it the result if there is none
+    function addValue(k: any, value: any): void {
+        if (stack.length === 0) {
+            result = value;
+            expect = "end";
+            return;
         }
+        const top = stack[stack.length - 1];
+        if (Array.isArray(top[1])) {
+            top[1].push(value);
+        } else {
+            top[1] = createNewEntry(top[1], k, value);
+        }
+        expect = "commaOrClose";
     }
-    return stack.pop()![1];
 
+    //closing bracket pops the container and adds it to its parent
+    function close(): void {
+        const previous = stack.pop()!;
+        addValue(previous[0], previous[1]);
+    }
+
+    for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        const top = stack[stack.length - 1];
+
+        if ((expect as string) === "end") {
+            throw new SyntaxError(`Invalid JSON: Unexpected trailing token at ${i}`);
+        }
+
+        if (expect === "colon") {
+            if (token !== ":") throw new SyntaxError(`Invalid JSON: Expected ":" at token ${i}`);
+            expect = "value";
+            continue;
+        }
+
+        if (expect === "key" || expect === "keyOrClose") {
+            //empty object
+            if (token === "}" && expect === "keyOrClose") {
+                close();
+                continue;
+            }
+            if (typeof token !== "string" || PUNCT.includes(token)) {
+                throw new SyntaxError(`Invalid JSON: Expected string key at token ${i}`);
+            }
+            key = token;
+            expect = "colon";
+            continue;
+        }
+
+        if (expect === "commaOrClose") {
+            const isArray = Array.isArray(top[1]);
+            if (token === ",") {
+                expect = isArray ? "value" : "key";
+                continue;
+            }
+            if (token === (isArray ? "]" : "}")) {
+                close();
+                continue;
+            }
+            throw new SyntaxError(`Invalid JSON: Expected "," or "${isArray ? "]" : "}"}" at token ${i}`);
+        }
+
+        //expect is "value" or "valueOrClose"
+        //empty array
+        if (token === "]" && expect === "valueOrClose") {
+            close();
+            continue;
+        }
+        //opening bracket signals creation of a new container
+        if (token === "{") {
+            stack.push([key, {}]);
+            expect = "keyOrClose";
+            continue;
+        }
+        if (token === "[") {
+            stack.push([key, []]);
+            expect = "valueOrClose";
+            continue;
+        }
+        if (PUNCT.includes(token)) {
+            throw new SyntaxError(`Invalid JSON: Unexpected "${token}" at token ${i}`);
+        }
+        addValue(key, token);
+    }
+
+    if (expect !== "end") {
+        throw new SyntaxError("Invalid JSON: Unexpected end of input");
+    }
+    return result;
 }
 
 export function json(raw: string): Object {
   let tokens : Array<any> = lexer(raw);
   return parser(tokens);
 }
+
 const raw = "{\"glossary\":{\"title\":\"example glossary\",\"GlossDiv\":{\"title\":\"S\",\"GlossList\":{\"GlossEntry\":{\"ID\":\"SGML\",\"SortAs\":\"SGML\",\"GlossTerm\":\"Standard Generalized Markup Language\",\"Acronym\":\"SGML\",\"Abbrev\":\"ISO 8879:1986\",\"GlossDef\":{\"para\":\"A meta-markup language, used to create markup languages such as DocBook.\",\"GlossSeeAlso\":[\"GML\",\"XML\"]},\"GlossSee\":\"markup\"}}}}}";
 console.log(json(raw))
