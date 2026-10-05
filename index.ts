@@ -159,7 +159,7 @@ function parser(tokens: Array<any>): Object {
             continue;
         }
 
-        if (expect === "commaOrClose") {
+        if ((expect as typeof expect) === "commaOrClose") {
             const isArray = Array.isArray(top[1]);
             if (token === ",") {
                 expect = isArray ? "value" : "key";
@@ -205,6 +205,3 @@ export function json(raw: string): Object {
   let tokens : Array<any> = lexer(raw);
   return parser(tokens);
 }
-
-const raw = "{\"glossary\":{\"title\":\"example glossary\",\"GlossDiv\":{\"title\":\"S\",\"GlossList\":{\"GlossEntry\":{\"ID\":\"SGML\",\"SortAs\":\"SGML\",\"GlossTerm\":\"Standard Generalized Markup Language\",\"Acronym\":\"SGML\",\"Abbrev\":\"ISO 8879:1986\",\"GlossDef\":{\"para\":\"A meta-markup language, used to create markup languages such as DocBook.\",\"GlossSeeAlso\":[\"GML\",\"XML\"]},\"GlossSee\":\"markup\"}}}}}";
-console.log(json(raw))

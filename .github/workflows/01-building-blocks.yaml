@@ -1,0 +1,15 @@
+name: 01-buidling-blocks
+
+on: push
+
+jobs:
+    echo-hello:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Say hi
+              run: echo "Hello world!"
+    echo-goodbye:
+        run-on: ubuntu-latest
+        steps:
+            - name: Say goodbye
+              run: echo "GoodBye!"
