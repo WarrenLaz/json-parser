@@ -160,6 +160,7 @@ function parser(tokens: Array<any>): Object {
         }
 
         if ((expect as typeof expect) === "commaOrClose") {
+
             const isArray = Array.isArray(top[1]);
             if (token === ",") {
                 expect = isArray ? "value" : "key";
@@ -198,7 +199,7 @@ function parser(tokens: Array<any>): Object {
     if (expect !== "end") {
         throw new SyntaxError("Invalid JSON: Unexpected end of input");
     }
-    return result;
+    return result;;
 }
 
 export function json(raw: string): Object {
