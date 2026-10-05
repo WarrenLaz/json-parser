@@ -9,7 +9,11 @@ jobs:
             - name: Say hi
               run: echo "Hello world!"
     echo-goodbye:
-        run-on: ubuntu-latest
+        runs-on: ubuntu-latest
         steps:
+            - name: failed
+              run: |
+                echo "failed"
+                exit 1
             - name: Say goodbye
               run: echo "GoodBye!"
