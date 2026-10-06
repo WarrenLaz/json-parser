@@ -55,6 +55,21 @@ jobs:
           # Use the Claude account the VM user is already logged into,
           # never an API key that might be lying around in the environment
           unset ANTHROPIC_API_KEY
+
+          # Non-interactive SSH sessions skip ~/.bashrc, so add the places
+          # Claude Code is usually installed to the PATH
+          export PATH="$HOME/.local/bin:$HOME/.claude/local:$HOME/.npm-global/bin:/usr/local/bin:$PATH"
+          if ! command -v claude >/dev/null 2>&1 && [ -s "$HOME/.nvm/nvm.sh" ]; then
+            # Installed through npm under nvm
+            . "$HOME/.nvm/nvm.sh"
+          fi
+          if ! command -v claude >/dev/null 2>&1; then
+            echo "claude not found on the VM. SSH in as this user, run 'which claude'," >&2
+            echo "and add that folder to the PATH line in this workflow." >&2
+            exit 1
+          fi
+          echo "Using Claude Code at $(command -v claude)"
+
           cd "$REPO_DIR"
 
           # Sync the VM's clone with the remote branch.
