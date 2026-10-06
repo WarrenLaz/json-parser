@@ -55,7 +55,6 @@ jobs:
           # Use the Claude account the VM user is already logged into,
           # never an API key that might be lying around in the environment
           unset ANTHROPIC_API_KEY
-          ls
           cd "$REPO_DIR"
 
           # Sync the VM's clone with the remote branch.
