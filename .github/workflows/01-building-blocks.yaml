@@ -1,19 +1,97 @@
-name: 01-buidling-blocks
+name: Update READMEs with Claude Code
 
-on: push
+on:
+  # Run only when code is pushed to main (but not when only the docs
+  # changed, so the VM's own push doesn't retrigger this workflow)
+  push:
+    branches: [main]
+    paths-ignore:
+      - "readmes/**"
+
+# Never run two updates at the same time
+concurrency:
+  group: update-readmes
+  cancel-in-progress: false
 
 jobs:
-    echo-hello:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Say hi
-              run: echo "Hello world!"
-    echo-goodbye:
-        runs-on: ubuntu-latest
-        steps:
-            - name: failed
-              run: |
-                echo "failed"
-                exit 1
-            - name: Say goodbye
-              run: echo "GoodBye!"
+  update-readmes:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Set up SSH key and known hosts
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.VM_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_vm
+          chmod 600 ~/.ssh/id_vm
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: SSH into VM, run Claude Code, push readmes
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          REPO_DIR: ${{ vars.VM_REPO_DIR }}
+          BRANCH: ${{ github.ref_name }}
+          SOURCE_SHA: ${{ github.sha }}
+          # Folder (relative to the repo root) that Claude edits and that gets committed
+          DOCS_DIR: readmes
+        run: |
+          # Values are passed over stdin with shell-safe quoting (%q).
+          {
+            printf 'export REPO_DIR=%q\n'   "$REPO_DIR"
+            printf 'export BRANCH=%q\n'     "$BRANCH"
+            printf 'export SOURCE_SHA=%q\n' "$SOURCE_SHA"
+            printf 'export DOCS_DIR=%q\n'   "$DOCS_DIR"
+
+            cat <<'REMOTE'
+          set -euo pipefail
+
+          # Use the Claude account the VM user is already logged into,
+          # never an API key that might be lying around in the environment
+          unset ANTHROPIC_API_KEY
+
+          cd "$REPO_DIR"
+
+          # Sync the VM's clone with the remote branch.
+          # NOTE: this discards local changes - use a clone dedicated to this job.
+          git fetch origin "$BRANCH"
+          git checkout "$BRANCH"
+          git reset --hard "origin/$BRANCH"
+          git clean -fd
+
+          mkdir -p "$DOCS_DIR"
+
+          PROMPT="Review the source code in this repository and update the documentation in the $DOCS_DIR/ directory so it accurately describes the project: what it does, how to install it, how to configure it, how to use it, and any commands, options or environment variables. Keep content that is still accurate, fix anything outdated, and add documentation for anything new, creating new files in $DOCS_DIR/ where that makes sense. Only create or edit files inside $DOCS_DIR/. Do not modify any other file and do not run git commands."
+
+          # Run Claude Code headlessly with the VM user's logged-in account,
+          # limited to reading and editing files
+          claude -p "$PROMPT" \
+            --allowedTools "Read,Glob,Grep,Edit,Write" \
+            --max-turns 40
+
+          # Only ever commit the docs folder, whatever else may have changed
+          git add -A -- "$DOCS_DIR"
+          if git diff --cached --quiet; then
+            echo "$DOCS_DIR/ is already up to date - nothing to push."
+          else
+            git -c user.name="Claude README Bot" \
+                -c user.email="readme-bot@users.noreply.github.com" \
+                commit -m "docs: update $DOCS_DIR for ${SOURCE_SHA:0:7} [skip ci]"
+            git push origin "HEAD:$BRANCH"
+            echo "Pushed $DOCS_DIR/ update."
+          fi
+
+          # Leave the clone clean for the next run
+          git reset --hard
+          git clean -fd
+          REMOTE
+          } | ssh -i ~/.ssh/id_vm \
+                  -o BatchMode=yes \
+                  -o StrictHostKeyChecking=yes \
+                  "$VM_USER@$VM_HOST" 'bash -l -s'
