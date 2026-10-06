@@ -85,9 +85,13 @@ jobs:
 
           # Run Claude Code headlessly with the VM user's logged-in account,
           # limited to reading and editing files
+          # </dev/null is essential: this script arrives on stdin, and without
+          # it claude would swallow the rest of the script (the git commit and
+          # push below) as part of its prompt, so they would never run
           claude -p "$PROMPT" \
             --allowedTools "Read,Glob,Grep,Edit,Write" \
-            --max-turns 40
+            --max-turns 40 \
+            < /dev/null
 
           # Only ever commit the docs folder, whatever else may have changed
           git add -A -- "$DOCS_DIR"
