@@ -201,7 +201,7 @@ function parser(tokens: Array<any>): Object {
     }
     return result;;
 }
-
+//fff
 export function json(raw: string): Object {
   let tokens : Array<any> = lexer(raw);
   return parser(tokens);
